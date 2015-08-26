@@ -39,3 +39,23 @@ if [[ -f ${packagefile} ]]; then
         pip install $package
     done < $packagefile
 fi
+
+# install matplotlib basemap
+if pip list installed --local | grep matplotlib; then
+    builddir=${TMPDIR}/gwpysoft-build
+    mkdir -p ${builddir} && cd ${builddir}
+    wget http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-1.0.7/basemap-1.0.7.tar.gz
+    tar -zxvf basemap-1.0.7.tar.gz
+    cd basemap-1.0.7
+    # build geos
+    export GEOS_DIR=${target}
+    cd geos-3.3.3
+    ./configure --prefix=${GEOS_DIR} --quiet
+    make
+    make install
+    # install basemap
+    cd ../
+    python setup.py --quiet install
+fi
+
+deactivate
