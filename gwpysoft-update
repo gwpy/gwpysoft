@@ -4,8 +4,6 @@ package=$1
 shift
 pipargs=$@
 . ~/opt/gwpysoft/bin/activate
-# uninstall
-pip uninstall $package --yes
 # install new version from git
-pip install --quiet $package $pipargs
+pip install --upgrade --quiet $package $pipargs
 deactivate
