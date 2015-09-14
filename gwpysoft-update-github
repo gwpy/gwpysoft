@@ -1,9 +1,16 @@
 #!/bin/bash -e
 
 package=$1
+if [[ "$package" == *"/"* ]]; then
+    org=`dirname $package`
+    package=`basename $package`
+else
+    org="gwpy"
+fi
+
 . ~/opt/gwpysoft/bin/activate
 # uninstall
 pip uninstall $package --yes
 # install new version from git
-pip install --quiet git+https://github.com/gwpy/$package.git
+pip install --quiet git+https://github.com/$org/$package.git
 deactivate
