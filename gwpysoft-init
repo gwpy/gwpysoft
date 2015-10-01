@@ -28,6 +28,7 @@ which pip &>/dev/null || easy_install -U --prefix=${PYTHON_USER_BASE} pip
 # install virtualenv
 pip install "virtualenv>=13.0" --user --quiet
 echo "Virtualenv is now installed"
+export PATH=${PATH}:${PYTHON_USER_BASE}/bin
 
 # -- create virtualenv
 virtualenv $target --system-site-packages --clear
