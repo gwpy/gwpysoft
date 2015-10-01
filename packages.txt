@@ -11,3 +11,4 @@ argparse
 git+https://github.com/gwpy/gwpy
 git+https://github.com/gwpy/gwsumm
 git+https://github.com/gwpy/vet
+git+https://github.com/ligovirgo/gwdetchar
