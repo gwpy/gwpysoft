@@ -8,6 +8,7 @@ gitpython
 h5py>=1.3
 importlib
 argparse
+bs4
 git+https://github.com/gwpy/gwpy
 git+https://github.com/gwpy/gwsumm
 git+https://github.com/gwpy/vet
