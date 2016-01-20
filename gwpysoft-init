@@ -41,10 +41,11 @@ if [[ -f ${packagefile} ]]; then
     done < $packagefile
 fi
 
+builddir=${TMPDIR}/gwpysoft-build
+mkdir -p ${builddir} && cd ${builddir}
+
 # install matplotlib basemap
 if pip list installed --local | grep matplotlib; then
-    builddir=${TMPDIR}/gwpysoft-build
-    mkdir -p ${builddir} && cd ${builddir}
     wget http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-1.0.7/basemap-1.0.7.tar.gz
     tar -zxvf basemap-1.0.7.tar.gz
     cd basemap-1.0.7
@@ -57,6 +58,57 @@ if pip list installed --local | grep matplotlib; then
     # install basemap
     cd ../
     python setup.py --quiet install
+    cd ../
+    rm -rf basemap-1.0.7
 fi
+
+# install MKL-compiled numpy/scipy
+command -v icc 1>/dev/null
+if [ "$?" -eq 0 ]; then
+    MKL_BUILD=${target}-mkl
+    ICC_PATH=${PROD_DIR}
+
+    # build numpy
+    NUMPY_VERSION=`python -c "import numpy; print(numpy.__version__)"`
+    wget https://github.com/numpy/numpy/archive/v${NUMPY_VERSION}.tar.gz -O numpy-${NUMPY_VERSION}.tar.gz
+    tar -zxvf numpy-${NUMPY_VERSION}.tar.gz
+    rm -f numpy-${NUMPY_VERSION}.tar.gz
+    cd numpy-${NUMPY_VERSION}
+    echo "[mkl]
+library_dirs = ${ICC_PATH}/mkl/lib/intel64/
+include_dirs = ${ICC_PATH}/mkl/include/
+mkl_libs = mkl_rt
+lapack_libs = 
+" > site.cfg
+    python setup.py config --compiler=intelem build_clib --compiler=intelem build_ext --compiler=intelem install --prefix ${MKL_BUILD}
+    cd -
+    rm -rf numpy-${NUMPY_VERSION}/
+
+    # install scipy
+    SCIPY_VERSION=`python -c "import scipy; print(scipy.__version__)"`
+    wget https://github.com/scipy/scipy/archive/v${SCIPY_VERSION}.tar.gz -O scipy-${SCIPY_VERSION}.tar.gz
+    tar -zxvf scipy-${SCIPY_VERSION}.tar.gz
+    rm -rf scipy-${SCIPY_VERSION}.tar.gz
+    cd scipy-${SCIPY_VERSION}
+    python setup.py config --compiler=intelem --fcompiler=intelem build_clib --compiler=intelem --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intelem install --prefix ${MKL_BUILD}
+    cd -
+    rm -rf scipy-${SCIPY_VERSION}/
+
+    # make etc file
+    mkdir -p ${MKL_BUILD}/etc
+    MKL_ENV=${MKL_BUILD}/etc/gwpy-user-env.sh
+    echo '#!/usr/bin/env bash
+ROOTDIR=$(readlink -f $(dirname "$BASH_SOURCE")/..)
+
+# set PATH
+PATH=${ROOTDIR}/bin:${PATH}
+PYTHONPATH=${ROOTDIR}/lib64/python2.6/site-packages:${ROOTDIR}/lib/python2.6/site-packages:${PYTHONPATH}
+' > ${MKL_ENV}
+
+fi
+
+# clean up build dir
+cd
+rmdir ${builddir}
 
 deactivate
