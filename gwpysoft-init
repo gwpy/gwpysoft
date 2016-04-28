@@ -41,7 +41,11 @@ if [[ -f ${packagefile} ]]; then
     done < $packagefile
 fi
 
-builddir=${TMPDIR}/gwpysoft-build
+if [[ -z ${TMPDIR} ]]; then
+    builddir="/tmp/gwpysoft-build"
+else:
+    builddir="${TMPDIR}/gwpysoft-build"
+fi
 mkdir -p ${builddir} && cd ${builddir}
 
 # install matplotlib basemap
