@@ -48,15 +48,15 @@ else:
 fi
 mkdir -p ${builddir} && cd ${builddir}
 
-# install matplotlib basemap
+# install matplotlib basemap (if we installed matplotlib)
 if pip list installed --local | grep matplotlib; then
-    wget http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-1.0.7/basemap-1.0.7.tar.gz
-    tar -zxvf basemap-1.0.7.tar.gz
+    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-1.0.7/basemap-1.0.7.tar.gz
+    tar -zxf basemap-1.0.7.tar.gz
     cd basemap-1.0.7
     # build geos
     export GEOS_DIR=${target}
     cd geos-3.3.3
-    ./configure --prefix=${GEOS_DIR} --quiet
+    ./configure --prefix=${GEOS_DIR} --quiet --enable-silent-rules
     make
     make install
     # install basemap
