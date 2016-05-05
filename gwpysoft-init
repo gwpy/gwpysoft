@@ -45,26 +45,25 @@ if [[ -f ${packagefile} ]]; then
 fi
 
 if [[ -z ${TMPDIR} ]]; then
-    builddir="/tmp/gwpysoft-build"
-else
     TMPDIR="/tmp"
-    builddir="${TMPDIR}/gwpysoft-build"
 fi
-mkdir -p ${builddir} && cd ${builddir}
+builddir="${TMPDIR}/gwpysoft-build-$USER"
+mkdir -p ${builddir}
+cd ${builddir}
 
 
-# install matplotlib basemap (if we installed matplotlib)
+# list packages installed here for use later
 piplist_="$TMPDIR/pip-list-$RANDOM.txt"
 pip list installed --local > ${piplist_}
-grep -q matplotlib ${piplist_}
-has_matplotlib="$?"
-rm -f ${piplist_}
-if [[ "${has_matplotlib}" -eq 0 ]]; then
+
+# install matplotlib basemap (if we installed matplotlib)
+if grep -q matplotlib ${piplist_}; then
     echo -n "    mpl-basemap ... "
     BASEMAP_VERSION="1.0.7"
     GEOS_VERSION="3.3.3"
-    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-${BASEMAP_VERSION}/basemap-${BASEMAP_VERSION}.tar.gz
+    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-${BASEMAP_VERSION}/basemap-${BASEMAP_VERSION}.tar.gz -O basemap-${BASEMAP_VERSION}.tar.gz
     tar -zxf basemap-${BASEMAP_VERSION}.tar.gz
+    rm -f basemap-${BASEMAP_VERSION}.tar.gz
     cd basemap-${BASEMAP_VERSION}
     # build geos
     export GEOS_DIR=${target}
@@ -99,8 +98,14 @@ fi
 echo "All packages installed"
 
 # install MKL-compiled numpy/scipy
-command -v icc 1>/dev/null
-if [ "$?" -eq 0 ]; then
+if grep -q scipy ${piplist_}; then
+    has_scipy=true
+    has_numpy=true
+fi
+if grep -q numpy ${piplist_}; then
+    has_numpy=true
+fi
+if command -v icc 1>/dev/null && [[ ${has_numpy} = true ]]; then
     echo "MKL detected on system, installing optimised numpy/scipy..."
     MKL_BUILD=${target}-mkl
     ICC_PATH=${PROD_DIR}
@@ -108,8 +113,8 @@ if [ "$?" -eq 0 ]; then
     # build numpy
     echo -n "    numpy ... "
     NUMPY_VERSION=`python -c "import numpy; print(numpy.__version__)"`
-    wget https://github.com/numpy/numpy/archive/v${NUMPY_VERSION}.tar.gz -O numpy-${NUMPY_VERSION}.tar.gz
-    tar -zxvf numpy-${NUMPY_VERSION}.tar.gz
+    wget -q https://github.com/numpy/numpy/archive/v${NUMPY_VERSION}.tar.gz -O numpy-${NUMPY_VERSION}.tar.gz
+    tar -zxf numpy-${NUMPY_VERSION}.tar.gz
     rm -f numpy-${NUMPY_VERSION}.tar.gz
     cd numpy-${NUMPY_VERSION}
     echo "[mkl]
@@ -118,21 +123,23 @@ include_dirs = ${ICC_PATH}/mkl/include/
 mkl_libs = mkl_rt
 lapack_libs = 
 " > site.cfg
-    python setup.py config --compiler=intelem build_clib --compiler=intelem build_ext --compiler=intelem install --prefix ${MKL_BUILD}
+    python setup.py config --quiet --compiler=intelem build_clib --compiler=intelem build_ext --compiler=intelem install --prefix ${MKL_BUILD}
     cd -
     rm -rf numpy-${NUMPY_VERSION}/
     echo "installed"
 
     # install scipy
-    echo -n "    scipy ... "
-    SCIPY_VERSION=`python -c "import scipy; print(scipy.__version__)"`
-    wget https://github.com/scipy/scipy/archive/v${SCIPY_VERSION}.tar.gz -O scipy-${SCIPY_VERSION}.tar.gz
-    tar -zxvf scipy-${SCIPY_VERSION}.tar.gz
-    rm -rf scipy-${SCIPY_VERSION}.tar.gz
-    cd scipy-${SCIPY_VERSION}
-    python setup.py config --compiler=intelem --fcompiler=intelem build_clib --compiler=intelem --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intelem install --prefix ${MKL_BUILD}
-    cd -
-    rm -rf scipy-${SCIPY_VERSION}/
+    if has_scipy; then
+        echo -n "    scipy ... "
+        SCIPY_VERSION=`python -c "import scipy; print(scipy.__version__)"`
+        wget -q https://github.com/scipy/scipy/archive/v${SCIPY_VERSION}.tar.gz -O scipy-${SCIPY_VERSION}.tar.gz
+        tar -zxf scipy-${SCIPY_VERSION}.tar.gz
+        rm -rf scipy-${SCIPY_VERSION}.tar.gz
+        cd scipy-${SCIPY_VERSION}
+        python setup.py config --quiet --compiler=intelem --fcompiler=intelem build_clib --compiler=intelem --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intelem install --prefix ${MKL_BUILD}
+        cd -
+        rm -rf scipy-${SCIPY_VERSION}/
+    fi
 
     # make etc file
     mkdir -p ${MKL_BUILD}/etc
@@ -147,14 +154,16 @@ PYTHONPATH=${ROOTDIR}/lib64/python2.6/site-packages:${ROOTDIR}/lib/python2.6/sit
     echo "installed"
 fi
 
-# clean up build dir
+# clean up
 cd
 rmdir ${builddir}
+rm -f ${piplist_}
 
 echo "Install complete. The following packages were installed"
 pip list installed --local
 
 echo "Virtualenv is ready, you can activate the virtualenv via
 
-. ${VIRTUAL_ENV}/bin/activate"
+. ${VIRTUAL_ENV}/bin/activate
+"
 deactivate
