@@ -36,43 +36,77 @@ virtualenv $target --system-site-packages --clear
 
 # install dependencies
 if [[ -f ${packagefile} ]]; then
+    echo "Installing packages:"
     while read package; do
-        pip install $package
+        echo -n "    $package ... "
+        pip install --quiet $package
+        echo "installed"
     done < $packagefile
 fi
 
 if [[ -z ${TMPDIR} ]]; then
     builddir="/tmp/gwpysoft-build"
-else:
+else
+    TMPDIR="/tmp"
     builddir="${TMPDIR}/gwpysoft-build"
 fi
 mkdir -p ${builddir} && cd ${builddir}
 
+
 # install matplotlib basemap (if we installed matplotlib)
-if pip list installed --local | grep matplotlib; then
-    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-1.0.7/basemap-1.0.7.tar.gz
-    tar -zxf basemap-1.0.7.tar.gz
-    cd basemap-1.0.7
+piplist_="$TMPDIR/pip-list-$RANDOM.txt"
+pip list installed --local > ${piplist_}
+grep -q matplotlib ${piplist_}
+has_matplotlib="$?"
+rm -f ${piplist_}
+if [[ "${has_matplotlib}" -eq 0 ]]; then
+    echo -n "    mpl-basemap ... "
+    BASEMAP_VERSION="1.0.7"
+    GEOS_VERSION="3.3.3"
+    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-${BASEMAP_VERSION}/basemap-${BASEMAP_VERSION}.tar.gz
+    tar -zxf basemap-${BASEMAP_VERSION}.tar.gz
+    cd basemap-${BASEMAP_VERSION}
     # build geos
     export GEOS_DIR=${target}
-    cd geos-3.3.3
-    ./configure --prefix=${GEOS_DIR} --quiet --enable-silent-rules
-    make
-    make install
+    cd geos-${GEOS_VERSION}
+    ./configure --prefix=${GEOS_DIR} --quiet 1>/dev/null
+    set +e
+    make &>./geos-build.err
+    if [[ "$?" -ne 0 ]]; then
+        cat ./geos-build.err
+        exit 1
+    fi
+    rm ./geos-build.err
+    make install &>./geos-install.err
+    if [[ "$?" -ne 0 ]]; then
+        cat ./geos-install.err
+        exit 1
+    fi
+    rm -f ./geos-install.err
     # install basemap
     cd ../
-    python setup.py --quiet install
+    python setup.py --quiet install &>./basemap-install.err
+    if [[ "$?" -ne 0 ]]; then
+        cat ./basemap-install.err
+        exit 1
+    fi
+    set -e
+    rm -f ./basemap-install.err
     cd ../
     rm -rf basemap-1.0.7
+    echo "installed"
 fi
+echo "All packages installed"
 
 # install MKL-compiled numpy/scipy
 command -v icc 1>/dev/null
 if [ "$?" -eq 0 ]; then
+    echo "MKL detected on system, installing optimised numpy/scipy..."
     MKL_BUILD=${target}-mkl
     ICC_PATH=${PROD_DIR}
 
     # build numpy
+    echo -n "    numpy ... "
     NUMPY_VERSION=`python -c "import numpy; print(numpy.__version__)"`
     wget https://github.com/numpy/numpy/archive/v${NUMPY_VERSION}.tar.gz -O numpy-${NUMPY_VERSION}.tar.gz
     tar -zxvf numpy-${NUMPY_VERSION}.tar.gz
@@ -87,8 +121,10 @@ lapack_libs =
     python setup.py config --compiler=intelem build_clib --compiler=intelem build_ext --compiler=intelem install --prefix ${MKL_BUILD}
     cd -
     rm -rf numpy-${NUMPY_VERSION}/
+    echo "installed"
 
     # install scipy
+    echo -n "    scipy ... "
     SCIPY_VERSION=`python -c "import scipy; print(scipy.__version__)"`
     wget https://github.com/scipy/scipy/archive/v${SCIPY_VERSION}.tar.gz -O scipy-${SCIPY_VERSION}.tar.gz
     tar -zxvf scipy-${SCIPY_VERSION}.tar.gz
@@ -108,11 +144,17 @@ ROOTDIR=$(readlink -f $(dirname "$BASH_SOURCE")/..)
 PATH=${ROOTDIR}/bin:${PATH}
 PYTHONPATH=${ROOTDIR}/lib64/python2.6/site-packages:${ROOTDIR}/lib/python2.6/site-packages:${PYTHONPATH}
 ' > ${MKL_ENV}
-
+    echo "installed"
 fi
 
 # clean up build dir
 cd
 rmdir ${builddir}
 
+echo "Install complete. The following packages were installed"
+pip list installed --local
+
+echo "Virtualenv is ready, you can activate the virtualenv via
+
+. ${VIRTUAL_ENV}/bin/activate"
 deactivate
