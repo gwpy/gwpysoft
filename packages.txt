@@ -10,6 +10,7 @@ importlib
 argparse
 beautifulsoup4
 gwpy>=0.1
+git+https://github.com/ligovirgo/trigfind
 git+https://github.com/gwpy/gwsumm
 git+https://github.com/gwpy/vet
 git+https://github.com/ligovirgo/gwdetchar
