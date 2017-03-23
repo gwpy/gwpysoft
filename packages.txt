@@ -16,3 +16,4 @@ git+https://github.com/ligovirgo/trigfind
 git+https://github.com/gwpy/gwsumm
 git+https://github.com/gwpy/vet
 git+https://github.com/ligovirgo/gwdetchar
+git+https://github.com/hveto/hveto
