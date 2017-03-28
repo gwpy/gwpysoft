@@ -32,7 +32,7 @@ install_package() {
     elif [[ ${package} =~ ^(git\+https://git|https://git) ]]; then
         name=`basename $package`
         pip uninstall $name --yes --quiet || true
-        pip install $package $@
+        pip install --quiet $package $@
     else
         pip install --quiet $package $@
     fi
