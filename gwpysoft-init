@@ -2,7 +2,13 @@
 #
 # Set up a new python virtualenv for the GWpy software stack
 
-# get name
+# import library functions
+here_=`cd "$( dirname $(readlink -f "${BASH_SOURCE[0]}" ) )" && pwd`
+. ${here_}/gwpysoftlib.sh
+
+# -----------------------------------------------------------------------------
+
+# get build name and input package file
 target=$1
 [[ -z ${target} ]] && target=${HOME}/opt/gwpysoft
 packagefile=$2
@@ -40,125 +46,12 @@ if [[ -f ${packagefile} ]]; then
     echo "Installing packages:"
     while read package; do
         echo -n "    $package ... "
-        pip install --quiet $package
+        install_package $package $target
         echo "installed"
     done < $packagefile
 fi
 
-if [[ -z ${TMPDIR} ]]; then
-    TMPDIR="/tmp"
-fi
-builddir="${TMPDIR}/gwpysoft-build-$USER"
-mkdir -p ${builddir}
-cd ${builddir}
-
-
-# list packages installed here for use later
-piplist_="$TMPDIR/pip-list-$RANDOM.txt"
-pip list installed --local > ${piplist_}
-
-# install matplotlib basemap (if we installed matplotlib)
-if grep -q matplotlib ${piplist_}; then
-    echo -n "    mpl-basemap ... "
-    BASEMAP_VERSION="1.0.7"
-    GEOS_VERSION="3.3.3"
-    wget -q http://downloads.sourceforge.net/project/matplotlib/matplotlib-toolkits/basemap-${BASEMAP_VERSION}/basemap-${BASEMAP_VERSION}.tar.gz -O basemap-${BASEMAP_VERSION}.tar.gz
-    tar -zxf basemap-${BASEMAP_VERSION}.tar.gz
-    rm -f basemap-${BASEMAP_VERSION}.tar.gz
-    cd basemap-${BASEMAP_VERSION}
-    # build geos
-    export GEOS_DIR=${target}
-    cd geos-${GEOS_VERSION}
-    ./configure --prefix=${GEOS_DIR} --quiet 1>/dev/null
-    set +e
-    make &>./geos-build.err
-    if [[ "$?" -ne 0 ]]; then
-        cat ./geos-build.err
-        exit 1
-    fi
-    rm ./geos-build.err
-    make install &>./geos-install.err
-    if [[ "$?" -ne 0 ]]; then
-        cat ./geos-install.err
-        exit 1
-    fi
-    rm -f ./geos-install.err
-    # install basemap
-    cd ../
-    python setup.py --quiet install &>./basemap-install.err
-    if [[ "$?" -ne 0 ]]; then
-        cat ./basemap-install.err
-        exit 1
-    fi
-    set -e
-    rm -f ./basemap-install.err
-    cd ../
-    rm -rf basemap-1.0.7
-    echo "installed"
-fi
 echo "All packages installed"
-
-# install MKL-compiled numpy/scipy
-if grep -q scipy ${piplist_}; then
-    has_scipy=true
-    has_numpy=true
-fi
-if grep -q numpy ${piplist_}; then
-    has_numpy=true
-fi
-if command -v icc 1>/dev/null && [[ ${has_numpy} = true ]]; then
-    echo "MKL detected on system, installing optimised numpy/scipy..."
-    MKL_BUILD=${target}-mkl
-    ICC_PATH=${PROD_DIR}
-
-    # build numpy
-    echo -n "    numpy ... "
-    NUMPY_VERSION=`python -c "import numpy; print(numpy.__version__)"`
-    wget -q https://github.com/numpy/numpy/archive/v${NUMPY_VERSION}.tar.gz -O numpy-${NUMPY_VERSION}.tar.gz
-    tar -zxf numpy-${NUMPY_VERSION}.tar.gz
-    rm -f numpy-${NUMPY_VERSION}.tar.gz
-    cd numpy-${NUMPY_VERSION}
-    echo "[mkl]
-library_dirs = ${ICC_PATH}/mkl/lib/intel64/
-include_dirs = ${ICC_PATH}/mkl/include/
-mkl_libs = mkl_rt
-lapack_libs = 
-" > site.cfg
-    python setup.py config --quiet --compiler=intelem build_clib --compiler=intelem build_ext --compiler=intelem install --prefix ${MKL_BUILD}
-    cd -
-    rm -rf numpy-${NUMPY_VERSION}/
-    echo "installed"
-
-    # install scipy
-    if has_scipy; then
-        echo -n "    scipy ... "
-        SCIPY_VERSION=`python -c "import scipy; print(scipy.__version__)"`
-        wget -q https://github.com/scipy/scipy/archive/v${SCIPY_VERSION}.tar.gz -O scipy-${SCIPY_VERSION}.tar.gz
-        tar -zxf scipy-${SCIPY_VERSION}.tar.gz
-        rm -rf scipy-${SCIPY_VERSION}.tar.gz
-        cd scipy-${SCIPY_VERSION}
-        python setup.py config --quiet --compiler=intelem --fcompiler=intelem build_clib --compiler=intelem --fcompiler=intelem build_ext --compiler=intelem --fcompiler=intelem install --prefix ${MKL_BUILD}
-        cd -
-        rm -rf scipy-${SCIPY_VERSION}/
-    fi
-
-    # make etc file
-    mkdir -p ${MKL_BUILD}/etc
-    MKL_ENV=${MKL_BUILD}/etc/gwpy-user-env.sh
-    echo '#!/usr/bin/env bash
-ROOTDIR=$(readlink -f $(dirname "$BASH_SOURCE")/..)
-
-# set PATH
-PATH=${ROOTDIR}/bin:${PATH}
-PYTHONPATH=${ROOTDIR}/lib64/python2.6/site-packages:${ROOTDIR}/lib/python2.6/site-packages:${PYTHONPATH}
-' > ${MKL_ENV}
-    echo "installed"
-fi
-
-# clean up
-cd
-rmdir ${builddir}
-rm -f ${piplist_}
 
 echo "Install complete. The following packages were installed"
 pip list installed --local

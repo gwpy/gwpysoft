@@ -1,9 +1,19 @@
 #!/bin/bash -e
 
-package=$1
+# import library functions
+here_=`cd "$( dirname $(readlink -f "${BASH_SOURCE[0]}" ) )" && pwd`
+. ${here_}/gwpysoftlib.sh
+
+# update package
+target=$1
+package=$2
 shift
 pipargs=$@
-. ~/opt/gwpysoft/bin/activate
-# install new version from git
-pip install --upgrade --quiet $package $pipargs
+
+. ${target}/bin/activate
+
+echo -n "Updating `basename $package` ... "
+install_package $package $target --upgrade
+echo " done"
+
 deactivate
