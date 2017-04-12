@@ -45,6 +45,10 @@ virtualenv $target --system-site-packages --clear
 if [[ -f ${packagefile} ]]; then
     echo "Installing packages:"
     while read package; do
+        # skip comments and blank lines
+        [[ "$package" =~ ^#.*$ ]] && continue
+        [[ -z "$package" ]] && continue
+        # install package
         echo -n "    $package ... "
         install_package $package $target
         echo "installed"
